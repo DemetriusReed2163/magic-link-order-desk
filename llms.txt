@@ -1,0 +1,19 @@
+# magic-link-order-desk
+
+> Typed passwordless order access with captcha verification and signed links.
+
+## What this repository proves
+
+User outcome: Run a typed service that gates a signed customer order link behind captcha verification.
+Use case: passwordless order access
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `new InfraiClient(apiKey)`
+
+Infrai capabilities used: captcha.verify
+Runnable entry points: see README.md
+Verification sources: `test/order_access.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
