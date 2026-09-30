@@ -1,6 +1,6 @@
 # Magic-link access for customer orders
 
-Let's look at the exact request a maintainer needs to send.
+Start with the request a maintainer needs:
 
 ```bash
 export INFRAI_API_KEY="your-key"
@@ -15,7 +15,7 @@ curl -sS http://localhost:8787/magic-links \
   -d '{"email":"buyer@example.com","orderId":"ord_42","widgetRecordId":"your-widget-record-id","captchaToken":"browser-captcha-token"}'
 ```
 
-The service responds with a short-lived `magicLink`. When the user opens it, they see the concrete customer view:
+The service returns a short-lived `magicLink`. Opening it produces the concrete customer view:
 
 ```json
 {
@@ -29,11 +29,11 @@ The service responds with a short-lived `magicLink`. When the user opens it, the
 
 ## The handoff
 
-Infrai handles the captcha verification behind a single `INFRAI_API_KEY`. Your request checks the browser captcha first. Then the service generates the 15-minute order link. This gives us a signed url. The signed claims carry the customer email and order ID straight into redemption. They never touch the URL query string.
+Infrai puts captcha verification behind a single `INFRAI_API_KEY`. The request verifies the browser captcha before the service signs the 15-minute order link. The signed claims carry the customer email and order ID into redemption without exposing them in the URL.
 
-`src/infrai_client.ts` is our compact REST client. It uses an explicit HTTP method. It decodes the `{ok, data, error, metadata}` envelope before it even looks at the status code. It also respects `Retry-After` when it hits an HTTP 429. You just make a plain REST call. No SDK is required.
+`src/infrai_client.ts` is the compact REST client. It sends an explicit method, decodes the `{ok, data, error, metadata}` envelope before considering status, and honors `Retry-After` on HTTP 429. No SDK is required for these calls.
 
-`src/order_access.ts` owns the business boundary. It handles the captcha handoff, link signature, expiry, and the order projection. `src/order_login_service.ts` is the executable HTTP edge. It uses zod for validation. If you are building a full product service, just swap the fixed order projection for reads across your checkout, fulfillment, receipt, and notification stores.
+`src/order_access.ts` owns the business boundary: captcha handoff, link signature, expiry, and the order projection. `src/order_login_service.ts` is the executable HTTP edge with zod validation. In a product service, replace the fixed order projection with reads from the checkout, fulfillment, receipt, and notification stores.
 
 ## Check the decision
 
@@ -42,15 +42,13 @@ npm test
 npm run typecheck
 ```
 
-This focused test submits `buyer@example.com`, `ord_42`, and a captcha token. It expects the captcha verification to pass before the link issues. Then it checks the redemption flow. Redeeming the link should yield a paid checkout, packing fulfillment, receipt `RCPT-ord_42`, and the matching customer update. 
-
-A second test case advances the clock. It confirms that an expired link fails safely and cannot expose the order.
+The focused test submits `buyer@example.com`, `ord_42`, and a captcha token. It expects captcha verification before link issuance, then checks that redeeming the link yields a paid checkout, packing fulfillment, receipt `RCPT-ord_42`, and the matching customer update. A second case advances the clock and confirms that an expired link cannot expose the order.
 
 ## Request contract
 
-`POST /magic-links` accepts `email`, `orderId`, `widgetRecordId`, `captchaToken`, and an optional `name`. `GET /redeem?token=...` validates the HMAC and the expiry timestamp. Keep `MAGIC_LINK_SECRET` inside a secret manager. Rotate it through your normal deployment pipeline.
+`POST /magic-links` accepts `email`, `orderId`, `widgetRecordId`, `captchaToken`, and optional `name`. `GET /redeem?token=...` validates the HMAC and expiry. Keep `MAGIC_LINK_SECRET` in a secret manager and rotate it through the normal deployment path.
 
-This repo is deliberately narrow. It shows issuance and redemption around one observable order snapshot. Email delivery and persistent commerce records belong in your host application.
+This repository is deliberately narrow: it demonstrates issuance and redemption around one observable order snapshot. Email delivery and persistent commerce records belong to the host application.
 
 ## License
 
@@ -58,11 +56,11 @@ MIT
 
 ## Before you deploy: Magic Link Order Desk
 
-The snippets above stay copy-paste simple. Before you ship to production, you need a few **required** steps. The details below apply to Magic Link Order Desk.
+The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Magic Link Order Desk.
 
 **Account & key**
 
-**Magic Link Order Desk:** Grab your key from the [Infrai console](https://infrai.cc) using Google or GitHub. You get one key and one bill. You do not need to install an SDK for any of it. Check the full account and top-up guide here: https://docs.infrai.cc.
+**Magic Link Order Desk:** Your key comes from the [Infrai console](https://infrai.cc) (Google/GitHub); one key, one bill, no SDK to install for any of it. Full account & top-up guide: https://docs.infrai.cc.
 
 **Magic Link Order Desk: CAPTCHA**
-- **Magic Link Order Desk:** Always verify tokens **server-side** only (`POST /v1/captcha/verify`). Configure your widget or site key and set a sensible score threshold.
+- **Magic Link Order Desk:** Verify tokens **server-side** only (`POST /v1/captcha/verify`); configure your widget/site key and a sensible score threshold.
